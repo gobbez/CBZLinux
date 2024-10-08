@@ -25,7 +25,7 @@ list_playing_id = []
 # Load configuration from file config.yml
 with open(config_path, 'r') as config_file:
     config = yaml.safe_load(config_file)
-
+    print(config)
 # Configure Lichess client with token
 session = berserk.TokenSession(config['token'])
 client = berserk.Client(session=session)
