@@ -8,6 +8,10 @@ import threading
 import time
 from pathlib import Path
 import ollama
+import sys
+
+# Avoid max recursion limit
+sys.setrecursionlimit(100000)
 
 # Load Stockfish
 THIS_FOLDER = Path(__file__).parent.resolve()
@@ -92,7 +96,7 @@ def stockfish_best_move(fen, opponent_elo):
             deep_time = 1.5
             skill_level = 14
         elif opponent_elo <= 2300:
-            deep_time = 2.3
+            deep_time = 2.5
             skill_level = 16
         elif opponent_elo <= 2500:
             deep_time = 5.0
@@ -110,20 +114,11 @@ def stockfish_best_move(fen, opponent_elo):
     deep_time, skill_level = get_level_time()
 
     if cp > 800:
-        pass
-    elif 600 < cp <= 800:
-        deep_time *= 0.1
-        skill_level -= 10
+        skill_level = 20
     elif 400 < cp <= 600:
-        deep_time *= 0.2
-        skill_level -= 8
-    elif 300 < cp <= 400:
-        deep_time *= 0.4
-        skill_level -= 6
-    elif 200 < cp <= 300:
-        deep_time *= 0.6
+        deep_time *= 0.5
         skill_level -= 4
-    elif 100 < cp <= 200:
+    elif 100 < cp <= 400:
         deep_time *= 0.7
         skill_level -= 3
     elif 50 < cp <= 100:
