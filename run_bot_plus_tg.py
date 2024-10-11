@@ -20,7 +20,7 @@ sys.setrecursionlimit(100000)
 # Load Stockfish
 THIS_FOLDER = Path(__file__).parent.resolve()
 # Path to your Stockfish binary
-STOCKFISH_PATH = THIS_FOLDER / "stockfish/stockfish-windows-x86-64-avx2.exe"
+STOCKFISH_PATH = THIS_FOLDER / "stockfish/stockfish-ubuntu-x86-64-avx2"
 config_path = THIS_FOLDER / "config.yml"
 # Opening Books
 king_gambit_path = THIS_FOLDER / "database/ChessOpeningBook_KingGambit_2.csv"
