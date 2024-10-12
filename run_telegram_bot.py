@@ -24,26 +24,32 @@ def load_global_db(search_for='', game_for='', action='', add_value=0):
     """
     This csv file will be shared between Lichess and Telegram Bots to set params
     Load the param(s) you are setting
-    :param search_for: str to tell what column to access
+    :param search_for: str to tell what column to access (Level or Think)
     :param game_for: value to access if a particular opponent or game to set params
     :param action: set or get
     :param add_value: value to be set
     :return: DataFrame to access modified params
     """
     # Set level from Telegram db
-    level_csv = THIS_FOLDER / "database/Stockfish_level.csv"
+    level_csv = THIS_FOLDER / "database/Set_Stockfish.csv"
     df_level = pd.read_csv(level_csv)
     if action == 'get':
-        set_level = None
         if game_for == 'global':
             df_level = df_level[df_level['Game'] == 'global']
             if search_for == 'level' and len(df_level) == 1:
                 set_level = df_level['Level'][0]
                 return set_level
+            elif search_for == 'think' and len(df_level) == 1:
+                set_think = df_level['Think'][0]
+                return set_think
     elif action == 'set':
         if game_for == 'global':
-            df_level.loc[df_level['Game'] == 'global', 'Level'] = add_value
-            df_level.to_csv(level_csv)
+            if search_for == 'level':
+                df_level.loc[df_level['Game'] == game_for, 'Level'] = add_value
+                df_level.to_csv(level_csv)
+            if search_for == 'think':
+                df_level.loc[df_level['Game'] == game_for, 'Think'] = add_value
+                df_level.to_csv(level_csv)
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -55,27 +61,30 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     user = update.effective_user
     await update.message.reply_text("Welcome! I'm Zoe, the Lichess Chess Bot!")
-    await update.message.reply_text("Type /menu to see the list of functions or /cancel to come back here")
+    await update.message.reply_text("You can check my website: https://chessbotzoe.pythonanywhere.com/")
+    await update.message.reply_text("Type /menu to see the list of functions")
     await menu(update, context)
 
 
 async def menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
-    Show every commands in a inline menu
+    Show every command in an inline menu
     """
     user = update.effective_user
-    await update.message.reply_text(
-        "Here's the list of my functions, divided per categories! Click one and i'll explain everything it does (more to come!)!")
+    await update.message.reply_text("Here's the list of my functions!")
 
     keyboard = [
         [
-            InlineKeyboardButton("🧑‍🎤 User Profile", callback_data='menu_start')
-        ],
-        [
-            InlineKeyboardButton("💰 Earn coins", callback_data='menu_earn_coins'),
+            InlineKeyboardButton("🚀 Stockfish engine for playing", callback_data='start'),
+            InlineKeyboardButton("👀 Equilize my level with yours", callback_data='start'),
+            InlineKeyboardButton("🤖 Gemma2b AI for chat", callback_data='start'),
+            InlineKeyboardButton("👨‍🏫 Human Opening moves", callback_data='start'),
+            InlineKeyboardButton("📮 Telegram Bot for info", callback_data='start'),
+            InlineKeyboardButton("🌐 Bot website", callback_data='start'),
+            InlineKeyboardButton("..many more to come..", callback_data='start'),
         ]]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text("What do you want to do?", reply_markup=reply_markup)
+    await update.message.reply_text("(Work In Progress..)", reply_markup=reply_markup)
 
 
 async def answers(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -87,7 +96,7 @@ async def answers(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text_received = update.message.text
     try:
         if user.id == telegram_myid:
-            # Search comand
+            # Set Level
             if text_received.startswith('set_level'):
                 if text_received[-2].startswith('0'):
                     set_value = int(text_received[-1])
@@ -97,6 +106,12 @@ async def answers(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     load_global_db('level', 'global', 'set', set_value)
                 value_setted = load_global_db('level', 'global', 'get', 0)
                 await update.message.reply_text(f"Level setted: {value_setted}")
+            # Set Thinking Time
+            elif text_received.startswith('set_thinking'):
+                set_think = int(text_received[12:])
+                load_global_db('think', 'global', 'set', set_think)
+                value_setted = load_global_db('think', 'global', 'get', 0)
+                await update.message.reply_text(f"Thinking setted: {value_setted}s")
     except:
         await update.message.reply_text("Wrong value for level")
 
