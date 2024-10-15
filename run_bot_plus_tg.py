@@ -13,9 +13,17 @@ import sys
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
+import subprocess
 
 import run_telegram_bot
 
+
+# Download ChromeDriver
+chrome_version = subprocess.check_output("google-chrome --version", shell=True).decode().strip()
+chrome_version = chrome_version.split()[-1]  # Ottieni solo la parte della versione
+subprocess.run(f"wget https://chromedriver.storage.googleapis.com/{chrome_version}/chromedriver_linux64.zip", shell=True)
+subprocess.run("unzip chromedriver_linux64.zip", shell=True)
+subprocess.run("sudo mv chromedriver /usr/local/bin/", shell=True)
 
 # Avoid max recursion limit
 sys.setrecursionlimit(100000)
