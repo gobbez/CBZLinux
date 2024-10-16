@@ -3,6 +3,7 @@ import asyncio
 import yaml
 import chess
 import chess.engine
+import chess.pgn
 import random
 import pandas as pd
 import threading
