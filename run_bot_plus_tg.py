@@ -439,7 +439,7 @@ def handle_game_bot_turn(game_id, fen, elo_opponent, opponent_name):
         try:
             print(f"Playing: {event['id']}")
         except:
-            continue
+            return
         if 'state' not in event:
             continue  # Skip this event if it doesn't contain the 'state' key
 
