@@ -101,11 +101,13 @@ def load_global_db(search_for='', game_for='', action='', add_value=0):
                 df_global.loc[df_global['Game'] == game_for, 'Wait_Api'] = add_value
                 df_global.to_csv(global_csv)
 
+
 def random_chat():
     global df_chat
     chat = df_chat['Intro_message'].to_list()
     send_random_chat = chat[random.randint(0, len(chat))]
     return send_random_chat
+
 
 def send_challenge():
     """
@@ -278,7 +280,6 @@ def stockfish_best_move(fen, opponent_elo, opponent_name):
             depth = 25
             threads_m = 18
         return deep_time, skill_level, hash_m, depth, threads_m
-
     # Set the board position
     board = chess.Board(fen)
     # Evaluate position CP to determine how the bot is playing (level, thinking time, hash memory, moves depth, threads)
@@ -335,7 +336,6 @@ def stockfish_best_move(fen, opponent_elo, opponent_name):
         skill_level = 1
     elif skill_level > 20:
         skill_level = 20
-
     # Check if a shared global var Level is setted (to modify level from Telegram Bot)
     set_level = load_global_db('level', 'global', 'get', 0)
     if set_level <= 0 or set_level is None:
@@ -347,7 +347,6 @@ def stockfish_best_move(fen, opponent_elo, opponent_name):
         skill_level = 20
     else:
         skill_level = set_level
-
     # Check if shared global var Think is setted (to modify thinking time from Telegram Bot)
     set_think = load_global_db('think', 'global', 'get', 0)
     if set_think <= 0 or set_think is None:
@@ -357,7 +356,6 @@ def stockfish_best_move(fen, opponent_elo, opponent_name):
         deep_time = 3600
     else:
         deep_time = set_think
-
     # Check if shared global var Hash is setted (to modify hash memory from Telegram Bot)
     set_hash = load_global_db('hash', 'global', 'get', 0)
     if set_hash <= 0 or set_hash is None:
@@ -367,7 +365,6 @@ def stockfish_best_move(fen, opponent_elo, opponent_name):
         hash_m = 2100
     else:
         hash_m = set_hash
-
     # Check if shared global var Depth is setted (to modify depth moves from Telegram Bot)
     set_depth = load_global_db('depth', 'global', 'get', 0)
     if set_depth <= 0 or set_depth is None:
@@ -377,7 +374,6 @@ def stockfish_best_move(fen, opponent_elo, opponent_name):
         depth = 30
     else:
         depth = set_depth
-
     # Check if shared global var Thread is setted (to modify threads from Telegram Bot)
     set_thread = load_global_db('thread', 'global', 'get', 0)
     if set_thread <= 0 or set_thread is None:
@@ -387,7 +383,6 @@ def stockfish_best_move(fen, opponent_elo, opponent_name):
         threads_m = 20
     else:
         threads_m = set_thread
-
     # Send message to Telegram Bot
     send_message = (f"Playing against: {opponent_name} -- {opponent_elo}\n"
                     f"CP evaluation: {cp // 100}\n"
@@ -396,7 +391,6 @@ def stockfish_best_move(fen, opponent_elo, opponent_name):
                     f"Hash Memory: {round(hash_m)}Mb\n"
                     f"Moves Depth: {round(depth)}\n"
                     f"Threads Num: {round(threads_m)}")
-
     run_telegram_bot.send_message_to_telegram(telegram_token, send_message)
     with chess.engine.SimpleEngine.popen_uci(STOCKFISH_PATH) as engine:
         # Set hash size (in MB)
@@ -422,6 +416,7 @@ def read_opening_book(fen):
     for move in df_move:
         move = str(move)
         return move
+
 
 def handle_game_bot_turn(game_id, fen, elo_opponent, opponent_name):
     """
@@ -496,6 +491,7 @@ def handle_game_bot_turn(game_id, fen, elo_opponent, opponent_name):
             # Set bot_thinking to 0 so that While iteration can continue
             bot_thinking = 0
             return
+
         except Exception as e:
             print(f"Invalid move: {e}")
             list_legal_moves = list(chess_board.legal_moves)
@@ -519,22 +515,22 @@ def handle_events():
                 counter += 1
                 counter_challenge += 1
                 print(f'While loop {counter}')
-                # Checks for challenges each 100 loops -- work in progress
-                if counter > 100:
-                    counter = 0
-                    get_challenges()
-                if counter_challenge > 10000:
+
+                if counter_challenge > 1000:
                     counter_challenge = 0
                     send_challenge()
+
                 # Get number of active games
                 ongoing_games = client.games.get_ongoing()
                 list_games_id = [game['gameId'] for game in ongoing_games]
+
                 # Stream every games
                 events = client.games.get_ongoing()
                 for event in events:
                     is_bot_turn = event['isMyTurn']
                     game_id = event['gameId']
                     print(game_id)
+
                     # Check if it's Bot Turn and if id is not in thread_list (prevent multiple threads on same game)
                     if is_bot_turn:
                         # Set bot_thinking to 1 in order to stop While iteration
@@ -556,7 +552,6 @@ def handle_events():
         bot_thinking = 0
         time.sleep(10)  # Wait for 90 seconds before retrying
         handle_events()  # Restart the event handling after the wait
-
     except Exception as e:
         print(f"Unexpected error: {e}")
         tg_message = f"Unexpected error: {e}"
@@ -565,28 +560,6 @@ def handle_events():
         time.sleep(10)  # Wait for 10 seconds before retrying
         handle_events()  # Restart the event handling after the wait
 
-def get_challenges():
-    """Work in progress"""
-    global bot_thinking
-    if bot_thinking == 0:
-        print('Checking challenges')
-        events = client.bots
-        for event in events:
-            if event['type'] == 'challenge':
-                if event['challenge']['speed'] in ['standard', 'correspondence']:
-                    # Accepting only rapid, standard and correspondence games for now (both rated and not)
-                    # Send message to Telegram Bot
-                    send_message = f"Accepted challenge {event}"
-                    run_telegram_bot.send_message_to_telegram(telegram_token, send_message)
-                    challenge_id = event['challenge']['id']
-                    client.bots.accept_challenge(challenge_id)
-                    print('Challenge accepted!')
-            return
-    else:
-        print('Bot is thinking. I cannot check challenges')
-    return
 
 if __name__ == "__main__":
     handle_events()
-
-
