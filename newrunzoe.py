@@ -17,36 +17,40 @@ from selenium.webdriver.common.by import By
 
 import run_telegram_bot
 
-
 # Avoid max recursion limit
 sys.setrecursionlimit(100000)
+
 THIS_FOLDER = Path(__file__).parent.resolve()
 # Path of Stockfish binary
-STOCKFISH_PATH = THIS_FOLDER / "stockfish/stockfish-windows-x86-64-avx2.exe"
+STOCKFISH_PATH = THIS_FOLDER / "stockfish/stockfish-ubuntu-x86-64-avx2"
 config_path = THIS_FOLDER / "config.yml"
 # Opening Books
 king_gambit_path = THIS_FOLDER / "database/ChessOpeningBook_KingGambit_2.csv"
 # Ollama chat
 df_chat = pd.read_csv(THIS_FOLDER / "database/AIChat.csv")
+
 # global variable to stop while if Stockfish is thinking (1 = stop while)
 bot_thinking = 0
 # global variable to send challenges (input starts from Telegram)
 challenge_mode = 0
 # Make the bot try 3 times
 try_challenge = 0
+
 # List of active games id:
 list_playing_id = []
+
+
 # Load configuration from file config.yml
 with open(config_path, 'r') as config_file:
     config = yaml.safe_load(config_file)
+
 # Configure Lichess client with token
 session = berserk.TokenSession(config['token'])
 client = berserk.Client(session=session)
-# Configure Challenges Lichess client to read challenges only
-challenges_session = berserk.TokenSession(config['challenges_token'])
-client_challenges = berserk.Client(session=challenges_session)
+
 # Configure Telegram bot with token
 telegram_token = config['tg_token']
+
 
 
 # Global shared (between Lichess and Telegram Bots) functions
@@ -654,5 +658,4 @@ def check_challenges():
 
 
 if __name__ == "__main__":
-    check_challenges()
-    #handle_events()
+    handle_events()
