@@ -1,4 +1,5 @@
 token: "insertoken"
+challenges_token: "insertchtoken"
 log: "lichess-bot.log"
 tg_token: "insert your Telegram token"
 tg_myid: "insert your Telegram ID"

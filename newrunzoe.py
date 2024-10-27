@@ -460,7 +460,10 @@ def stockfish_best_move(fen, opponent_elo, opponent_name):
         threads_m = set_thread
 
     # Estimate Stockfish Elo strength
-    elo_strength = (skill_level/20 + hash_m/2024 + depth/30 + threads_m/15 + deep_time/15) / 5 * 3200
+    try:
+        elo_strength = (skill_level/20 + hash_m/2024 + depth/30 + threads_m/15 + deep_time/15) / 5 * 3200
+    except:
+        elo_strength = 2000
 
     # Send message to Telegram Bot
     send_message = (f"Playing against: {opponent_name} -- {opponent_elo}\n"
@@ -485,11 +488,10 @@ def stockfish_best_move(fen, opponent_elo, opponent_name):
 
 def handle_game_bot_turn(game_id, fen, elo_opponent, opponent_name):
     """
-    This function handles the moves on Lichess
+    This function handles the moves on Lichess and saves moves.
     :param game_id: the game id that the bot is currently playing
     :param fen: the fen position, to pass to read_fen_database to extract move
     :param elo_opponent: opponent Lichess elo
-    :param opponent_name: name of the opponent on Lichess
     """
     global bot_thinking
     chess_board = chess.Board()
@@ -531,7 +533,7 @@ def handle_game_bot_turn(game_id, fen, elo_opponent, opponent_name):
                     avg_rating = avg_rating[-4:]
                 elif avg_rating[-3].startswith(('1', '2', '3')):
                     avg_rating = avg_rating[-3:]
-                send_message = f'My move is a human move that was played {get_number_played} times, with avg Elo: {round(avg_rating)}'
+                send_message = f'My move is a human move that was played {get_number_played} times, with avg Elo: {avg_rating}'
                 client.bots.post_message(game_id, send_message, False)
                 tg_message = f"Playing against: {opponent_name} -- {elo_opponent}\n"
                 run_telegram_bot.send_message_to_telegram(telegram_token, tg_message + send_message)
@@ -541,7 +543,7 @@ def handle_game_bot_turn(game_id, fen, elo_opponent, opponent_name):
                 client.bots.make_move(game_id, next_move.uci())
                 chess_board.push(next_move)
                 print(f'I moved from Stockfish at {elo_strength} Elo')
-                send_message = f'My move is from Stockfish 17 at {round(elo_strength)} Elo'
+                send_message = f'My move is from Stockfish 17 at {elo_strength} Elo'
                 client.bots.post_message(game_id, send_message, False)
             # Set bot_thinking to 0 so that While iteration can continue
             bot_thinking = 0
@@ -555,7 +557,7 @@ def handle_game_bot_turn(game_id, fen, elo_opponent, opponent_name):
             chess_board.push(rand_move)
             print('Invalid move.. i moved random')
             tg_message = f"Playing against: {opponent_name} -- {elo_opponent}\n"
-            run_telegram_bot.send_message_to_telegram(telegram_token, tg_message + 'I moved random')
+            run_telegram_bot.send_message_to_telegram(telegram_token, tg_message + f'I moved random as {e}')
             bot_thinking = 0
             return
 
