@@ -14,6 +14,7 @@ import sys
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
+import platform
 
 import run_telegram_bot
 
@@ -22,9 +23,9 @@ import run_telegram_bot
 sys.setrecursionlimit(100000)
 THIS_FOLDER = Path(__file__).parent.resolve()
 # Path of Stockfish binary (try both Windows and Linux Paths)
-try:
+if platform.system() == 'Windows':
     STOCKFISH_PATH = THIS_FOLDER / "stockfish/stockfish-windows-x86-64-avx2.exe"
-except:
+else:
     STOCKFISH_PATH = THIS_FOLDER / "stockfish/stockfish-ubuntu-x86-64-avx2"
 
 config_path = THIS_FOLDER / "config.yml"
@@ -483,7 +484,7 @@ def stockfish_best_move(fen, opponent_elo, opponent_name):
         # Set level
         engine.configure({"Skill Level": skill_level})
         result = engine.play(board, chess.engine.Limit(time=deep_time, depth=depth))
-    return result.move, elo_strength
+    return result.move, round(elo_strength)
 
 
 def handle_game_bot_turn(game_id, fen, elo_opponent, opponent_name):
