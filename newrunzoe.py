@@ -34,9 +34,6 @@ king_gambit_path = THIS_FOLDER / "database/ChessOpeningBook_KingGambit_2.csv"
 # Ollama chat
 df_chat = pd.read_csv(THIS_FOLDER / "database/AIChat.csv")
 
-# global variable to stop while if Stockfish is thinking (1 = stop while)
-bot_thinking = 0
-
 # global variable to send challenges (input starts from Telegram)
 challenge_mode = 0
 # Make the bot try 3 times
@@ -431,6 +428,8 @@ def stockfish_best_move(fen, opponent_elo, opponent_name, game_id):
             skill_level = 1
         elif skill_level > 20:
             skill_level = 20
+        if threads_m >= 12:
+            threads_m = 12
         # Check if a shared global var Level is setted (to modify level from Telegram Bot)
         set_level = load_global_db('level', 'global', 'get', 0)
         if set_level <= 0 or set_level is None:
@@ -481,7 +480,7 @@ def stockfish_best_move(fen, opponent_elo, opponent_name, game_id):
 
         # Estimate Stockfish Elo strength
         try:
-            elo_strength = (skill_level/20 + hash_m/2024 + depth/25 + threads_m/12 + deep_time/10) / 5 * 3200
+            elo_strength = (skill_level/20 + hash_m/5000 + depth/30 + threads_m/12 + deep_time/20) / 5 * 3200
         except:
             elo_strength = 2000
 
@@ -514,7 +513,6 @@ def handle_game_bot_turn(game_id, fen, elo_opponent, opponent_name):
     :param fen: the fen position, to pass to read_fen_database to extract move
     :param elo_opponent: opponent Lichess elo
     """
-    global bot_thinking
     chess_board = chess.Board()
     move_number = 1  # Initialize move number
     for event in client.bots.stream_game_state(game_id):
@@ -566,8 +564,6 @@ def handle_game_bot_turn(game_id, fen, elo_opponent, opponent_name):
                 print(f'I moved from Stockfish at {elo_strength} Elo')
                 send_message = f'My move is from Stockfish 17 at {elo_strength} Elo'
                 client.bots.post_message(game_id, send_message, False)
-            # Set bot_thinking to 0 so that While iteration can continue
-            bot_thinking = 0
             return
 
         except Exception as e:
@@ -579,46 +575,48 @@ def handle_game_bot_turn(game_id, fen, elo_opponent, opponent_name):
             print('Invalid move.. i moved random')
             tg_message = f"Playing against: {opponent_name} -- {elo_opponent}\n"
             run_telegram_bot.send_message_to_telegram(telegram_token, tg_message + f'I moved random as {e}')
-            bot_thinking = 0
             return
 
 
-def handle_single_event():
+def handle_single_event(game_id):
     """
     Handle only one event, in another Thread, for game(s) with less than 2'
     """
-    global bot_thinking
+    countdown = 0
     try:
         while True:
-            # Process only if Stockfish isn't thinking a move
-            if bot_thinking == 0:
-                event = client.games.get_ongoing(1)
-                if event[0]['isMyTurn']:
-                    game_id = event[0]['gameId']
-                    print(game_id)
-                    # Set bot_thinking to 1 in order to stop While iteration
-                    bot_thinking = 1
+            # If countdown is >= 1000 then close this function and thread
+            countdown += 1
+            if countdown >= 1000:
+                hurry_list.remove(game_id)
+                return
+            # Stream every game but focus only on the game with < 2 min (game_id)
+            events = client.games.get_ongoing()
+            for event in events:
+                is_bot_turn = event['isMyTurn']
+                all_game_id = event['gameId']
+                if all_game_id == game_id and is_bot_turn:
+                    # This means the thread is still active
+                    countdown -= 1
                     # If first move send welcome message
-                    if event[0]['hasMoved'] == False:
+                    if event['hasMoved'] == False:
                         ai_send_message = random_chat()
                         client.bots.post_message(game_id, ai_send_message, False)
-                    fen = event[0]['fen']
-                    elo_opponent = event[0]['opponent']['rating']
-                    opponent_name = event[0]['opponent']['username']
+                    fen = event['fen']
+                    elo_opponent = event['opponent']['rating']
+                    opponent_name = event['opponent']['username']
                     print('My turn')
                     handle_game_bot_turn(game_id, fen, elo_opponent, opponent_name)
     except berserk.exceptions.ResponseError as e:
         print(f"Rate limit exceeded: {e}. Waiting before retrying...")
         tg_message = f"Rate limit exceeded: {e}. Waiting before retrying..."
         run_telegram_bot.send_message_to_telegram(telegram_token, tg_message + 'I moved random')
-        bot_thinking = 0
         time.sleep(10)  # Wait for 90 seconds before retrying
         handle_events()  # Restart the event handling after the wait
     except Exception as e:
         print(f"Unexpected error: {e}")
         tg_message = f"Unexpected error: {e}"
         run_telegram_bot.send_message_to_telegram(telegram_token, tg_message + 'I moved random')
-        bot_thinking = 0
         time.sleep(10)  # Wait for 10 seconds before retrying
         handle_events()  # Restart the event handling after the wait
 
@@ -627,73 +625,67 @@ def handle_events():
     """
     Most important function. Loops each active game on Lichess and handle moves and threads
     """
-    global bot_thinking
     counter_challenge = 0
     try:
         while True:
-            # Process only if Stockfish isn't thinking a move
-            if bot_thinking == 0:
-                counter_challenge += 1
+            counter_challenge += 1
 
-                set_challenge_loops = load_global_db('challenge_loops', 'global', 'get', 0)
-                if set_challenge_loops < 100:
-                    challenge_loops = 2000
-                else:
-                    challenge_loops = set_challenge_loops
-                print(f'While loop num: {counter_challenge} -- challenge is at: {challenge_loops}')
-                if counter_challenge > challenge_loops:
-                    counter_challenge = 0
-                    send_challenge()
+            set_challenge_loops = load_global_db('challenge_loops', 'global', 'get', 0)
+            if set_challenge_loops < 100:
+                challenge_loops = 2000
+            else:
+                challenge_loops = set_challenge_loops
+            print(f'While loop num: {counter_challenge} -- challenge is at: {challenge_loops}')
+            if counter_challenge > challenge_loops:
+                counter_challenge = 0
+                send_challenge()
 
-                # Check challenges
-                if challenge_loops % 5 == 0:
-                    #check_challenges()
+            # Check challenges
+            if challenge_loops % 5 == 0:
+                check_challenges()
+                pass
+
+            # Stream every games
+            events = client.games.get_ongoing()
+            for event in events:
+                is_bot_turn = event['isMyTurn']
+                game_id = event['gameId']
+
+                try:
+                    if event['secondsLeft'] <= 120 and is_bot_turn and game_id not in hurry_list:
+                        # If game has < 2' secondsLeft create a thread just for it
+                        thread = threading.Thread(target=handle_single_event, args=(game_id,))
+                        thread.start()
+                        hurry_list.append(game_id)
+                        continue
+                except:
                     pass
 
-                # Stream every games
-                events = client.games.get_ongoing()
-                for event in events:
-                    is_bot_turn = event['isMyTurn']
-                    game_id = event['gameId']
+                print(game_id)
 
-                    try:
-                        if event['secondsLeft'] <= 120 and is_bot_turn and game_id not in hurry_list:
-                            # If game has < 2' secondsLeft create a thread just for it
-                            thread = threading.Thread(target=handle_single_event)
-                            thread.start()
-                            hurry_list.append(game_id)
-                    except:
-                        continue
-
-                    print(game_id)
-
-                    # Check if it's Bot Turn and if it's not in the other Thread
-                    if game_id not in hurry_list:
-                        if is_bot_turn:
-                            # Set bot_thinking to 1 in order to stop While iteration
-                            bot_thinking = 1
-                            # If first move send welcome message
-                            if event['hasMoved'] == False:
-                                ai_send_message = random_chat()
-                                client.bots.post_message(game_id, ai_send_message, False)
-                            fen = event['fen']
-                            elo_opponent = event['opponent']['rating']
-                            opponent_name = event['opponent']['username']
-                            print('My turn')
-                            handle_game_bot_turn(game_id, fen, elo_opponent, opponent_name)
+                # Check if it's Bot Turn and if it's not in the other Thread
+                if game_id not in hurry_list:
+                    if is_bot_turn:
+                        # If first move send welcome message
+                        if event['hasMoved'] == False:
+                            ai_send_message = random_chat()
+                            client.bots.post_message(game_id, ai_send_message, False)
+                        fen = event['fen']
+                        elo_opponent = event['opponent']['rating']
+                        opponent_name = event['opponent']['username']
+                        print('My turn')
+                        handle_game_bot_turn(game_id, fen, elo_opponent, opponent_name)
 
     except berserk.exceptions.ResponseError as e:
         print(f"Rate limit exceeded: {e}. Waiting before retrying...")
         tg_message = f"Rate limit exceeded: {e}. Waiting before retrying..."
         run_telegram_bot.send_message_to_telegram(telegram_token, tg_message + 'I moved random')
-        bot_thinking = 0
         time.sleep(10)  # Wait for 90 seconds before retrying
         handle_events()  # Restart the event handling after the wait
     except Exception as e:
         print(f"Unexpected error: {e}")
         tg_message = f"Unexpected error: {e}"
         run_telegram_bot.send_message_to_telegram(telegram_token, tg_message + 'I moved random')
-        bot_thinking = 0
         time.sleep(10)  # Wait for 10 seconds before retrying
         handle_events()  # Restart the event handling after the wait
 
