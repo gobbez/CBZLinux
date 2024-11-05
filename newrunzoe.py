@@ -11,9 +11,6 @@ import time
 from pathlib import Path
 import ollama
 import sys
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.common.by import By
 import platform
 
 import run_telegram_bot
@@ -203,86 +200,6 @@ def send_challenge():
         except Exception as e:
             print(f'Error: {e}')
             try_challenge += 1
-
-
-# Lichess Analysis Move
-def lichess_analysis_move(fen, game_pgn, tot_moves, game_id):
-    """
-    Connects to Lichess Analysis Board, filters for >2500 Lichess users and play the most played move
-    :param fen: fen position
-    :param game_pgn: pgn of game
-    :param tot_moves: total numbers played in the game
-    :param game_id: id of the game
-    :return: the most played move (if any), number of times that move is played, avg_rating of played moves
-    """
-    # Use Lichess only if game has more than 2'
-    if game_id not in hurry_list:
-        # Set up Chrome options for headless browsing
-        chrome_options = Options()
-        chrome_options.add_argument("--headless")
-        chrome_options.add_argument("--no-sandbox")
-        chrome_options.add_argument("--disable-dev-shm-usage")
-        # Initialize the driver with the specified options
-        driver = webdriver.Chrome(options=chrome_options)
-        # Go to Analysis Board
-        link = f'https://lichess.org/analysis'
-        driver.get(link)
-        try:
-            # Write PGN in Lichess Analysis
-            game_pgn = str(game_pgn)
-            write_pgn = driver.find_element(By.CSS_SELECTOR, "textarea.copyable")
-            write_pgn.click()
-            write_pgn.send_keys(game_pgn)
-            driver.find_element(By.CSS_SELECTOR,"button.button.button-thin.bottom-item.bottom-action.text[data-icon='']").click()
-            # Click on "book icon"
-            driver.find_element(By.CLASS_NAME, 'fbt').click()
-            # Get Opening Name and tell it if it's 3rd move
-            if 1 < tot_moves < 10:
-                print(tot_moves)
-                # driver.find_element(By.CLASS_NAME,'message').click()
-                # Click on move tot_moves to get Opening name
-                move_xpath = f"//index[text()='{tot_moves}']/following-sibling::move"
-                print('ok found move number')
-                move_element = driver.find_element(By.XPATH, move_xpath)
-                move_element.click()
-                print('ok click on move number')
-                time.sleep(2)
-                title_element = driver.find_element(By.CLASS_NAME, "title")
-                title_text = title_element.get_attribute("title")
-                print('ok get title opening')
-                # Send message to Lichess Chat
-                message = f"We are playing this Opening: {title_text}"
-                client.bots.post_message(game_id, message, False)
-                run_telegram_bot.send_message_to_telegram(telegram_token, message)
-                # Go to last move
-                move_xpath = "//index[last()]/following-sibling::move[last()]"
-                move_element = driver.find_element(By.XPATH, move_xpath)
-                move_element.click()
-            # Click on Lichess players
-            time.sleep(1)
-            driver.find_element(By.XPATH, '//button[contains(@class, "button-link") and text()="Lichess"]').click()
-            # Open filter settings
-            driver.find_element(By.CLASS_NAME, 'toconf').click()
-            # Select only rapid and longer (de-select bullet and blitz)
-            driver.find_element(By.XPATH, '//button[@title="Bullet"]').click()
-            driver.find_element(By.XPATH, '//button[@title="Blitz"]').click()
-            # Select only >2200 elo
-            for i in ['1000', '1200', '1400', '1600', '1800', '2000', '2200']:
-                driver.find_element(By.XPATH, f'//button[text()={i}]').click()
-            # Confirm
-            driver.find_element(By.XPATH, '//button[@class="button button-green text" and @data-icon=""]').click()
-            # Find element <tr> with data-uci="move"
-            get_move = driver.find_element(By.XPATH, '//tbody[@data-fen]/tr[1]')
-            # Find number playing
-            get_num_played = driver.find_element(By.XPATH, '//tbody/tr[1]/td[3]').text
-            # Find avg rating
-            avg_rating = driver.find_element(By.XPATH, '//td[contains(@title, "Punteggio medio")]').get_attribute("title")
-            move = get_move.get_attribute('data-uci')
-            return move, get_num_played, avg_rating
-        except:
-            return 0, 0, 0
-    else:
-        return 0, 0, 0
 
 
 # STOCKFISH FUNCTIONS
@@ -540,30 +457,13 @@ def handle_game_bot_turn(game_id, fen, elo_opponent, opponent_name):
                 print(f"Move {move} is not legal at the current board state.")
 
         try:
-            # Use Lichess Analysis to find the most played human move and get Opening Name
-            next_move, get_number_played, avg_rating = lichess_analysis_move(fen, game_pgn, tot_moves, game_id)
-            if next_move != 0:
-                # Move the most played move from Lichess Analysis Board
-                client.bots.make_move(game_id, next_move)
-                chess_board.push_uci(next_move)
-                print('I moved from Lichess Analysis Board')
-                # Get avg_elo correctly
-                if avg_rating[-4].startswith(('1', '2', '3')):
-                    avg_rating = avg_rating[-4:]
-                elif avg_rating[-3].startswith(('1', '2', '3')):
-                    avg_rating = avg_rating[-3:]
-                send_message = f'My move is a human move that was played {get_number_played} times, with avg Elo: {avg_rating}'
-                client.bots.post_message(game_id, send_message, False)
-                tg_message = f"Playing against: {opponent_name} -- {elo_opponent}\n"
-                run_telegram_bot.send_message_to_telegram(telegram_token, tg_message + send_message)
-            else:
-                # Use Stockfish 17 to find best move
-                next_move, elo_strength = stockfish_best_move(fen, elo_opponent, opponent_name, game_id)
-                client.bots.make_move(game_id, next_move.uci())
-                chess_board.push(next_move)
-                print(f'I moved from Stockfish at {elo_strength} Elo')
-                send_message = f'My move is from Stockfish 17 at {elo_strength} Elo'
-                client.bots.post_message(game_id, send_message, False)
+            # Use Stockfish 17 to find best move
+            next_move, elo_strength = stockfish_best_move(fen, elo_opponent, opponent_name, game_id)
+            client.bots.make_move(game_id, next_move.uci())
+            chess_board.push(next_move)
+            print(f'I moved from Stockfish at {elo_strength} Elo')
+            send_message = f'My move is from Stockfish 17 at {elo_strength} Elo'
+            client.bots.post_message(game_id, send_message, False)
             return
 
         except Exception as e:
@@ -638,7 +538,7 @@ def handle_events():
             print(f'While loop num: {counter_challenge} -- challenge is at: {challenge_loops}')
             if counter_challenge > challenge_loops:
                 counter_challenge = 0
-                send_challenge()
+                # send_challenge()
 
             # Check challenges
             if challenge_loops % 5 == 0:
