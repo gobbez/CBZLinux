@@ -538,7 +538,7 @@ def handle_events():
             print(f'While loop num: {counter_challenge} -- challenge is at: {challenge_loops}')
             if counter_challenge > challenge_loops:
                 counter_challenge = 0
-                # send_challenge()
+                send_challenge()
 
             # Check challenges
             if challenge_loops % 5 == 0:
